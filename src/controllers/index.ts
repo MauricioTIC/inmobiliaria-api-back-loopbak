@@ -6,3 +6,4 @@ export * from './inmueble-imagen.controller';
 export * from './propietario.controller';
 export * from './inmueble.controller';
 export * from './imagen.controller';
+export * from './saludar.controller';
