@@ -1,30 +1,54 @@
+import {service} from '@loopback/core';
 import {
   Count,
   CountSchema,
   Filter,
   FilterExcludingWhere,
   repository,
-  Where,
+  Where
 } from '@loopback/repository';
 import {
-  post,
-  param,
-  get,
-  getModelSchemaRef,
-  patch,
-  put,
-  del,
-  requestBody,
-  response,
+  del, get,
+  getModelSchemaRef, HttpErrors, param, patch, post, put, requestBody,
+  response
 } from '@loopback/rest';
+import fetch from 'cross-fetch';
 import {Propietario} from '../models';
+import {Credenciales} from '../models/credenciales.model';
 import {PropietarioRepository} from '../repositories';
+import {AutenticacionService} from '../services/autenticacion.service';
+
 
 export class PropietarioController {
   constructor(
     @repository(PropietarioRepository)
-    public propietarioRepository : PropietarioRepository,
-  ) {}
+    public propietarioRepository: PropietarioRepository,
+    @service(AutenticacionService)
+    public servicioAutenticacion: AutenticacionService
+  ) { }
+
+  @post('/validar-acceso')
+  @response(200, {
+    description: 'validar el accceso a la plataforma'
+  })
+  async validarAcceso(
+    @requestBody() credenciales: Credenciales
+  ) {
+    let prop = await this.servicioAutenticacion.validarAcceso(credenciales.usuario, credenciales.clave);
+    if (prop) {
+      let token = this.servicioAutenticacion.generarTokenJWT(prop);
+      return {
+        datos: {
+          nombre: `${prop.nombres} ${prop.apellidos}`,
+          correo: prop.correo,
+          id: prop.id
+        },
+        token: token
+      }
+    } else {
+      throw new HttpErrors[401]("No tiene permisos para realizar esta petición");
+    }
+  }
 
   @post('/propietarios')
   @response(200, {
@@ -44,7 +68,25 @@ export class PropietarioController {
     })
     propietario: Omit<Propietario, 'id'>,
   ): Promise<Propietario> {
-    return this.propietarioRepository.create(propietario);
+    let clave = this.servicioAutenticacion.generarClave();
+    propietario.clave = this.servicioAutenticacion.cifrarClave(clave);
+    let prop = await this.propietarioRepository.create(propietario);
+
+    //enviar notificación
+    let notificacion = {
+      correo: prop.correo,
+      asunto: 'Inmobiliaria G-XX - Credenciales de Acceso',
+      mensaje: `usuario: ${prop.correo} <br> pass: ${prop.clave}`
+    }
+    let url_servicio_correo = `http://localhost:5000/enviar-correo?correo=${notificacion.correo}&asunto=${notificacion.asunto}&mensaje=${notificacion.mensaje}`;
+    console.log(url_servicio_correo);
+    fetch(url_servicio_correo)
+      .then((response) => {
+        return response.text();
+      })
+      .then(data => console.log(`Respuesta servicio: ${data}`));
+
+    return prop;
   }
 
   @get('/propietarios/count')

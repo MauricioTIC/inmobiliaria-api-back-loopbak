@@ -1,31 +1,89 @@
+import {authenticate} from '@loopback/authentication';
+import {service} from '@loopback/core';
 import {
   Count,
   CountSchema,
   Filter,
   FilterExcludingWhere,
   repository,
-  Where,
+  Where
 } from '@loopback/repository';
 import {
-  post,
-  param,
-  get,
-  getModelSchemaRef,
-  patch,
-  put,
-  del,
-  requestBody,
-  response,
+  del, get,
+  getModelSchemaRef, param, patch, post, put, requestBody,
+  response
 } from '@loopback/rest';
 import {Inmueble} from '../models';
 import {InmuebleRepository} from '../repositories';
+import {InmuebleService} from '../services/inmobiliaria.service';
 
+@authenticate("admin")
 export class InmuebleController {
   constructor(
     @repository(InmuebleRepository)
-    public inmuebleRepository : InmuebleRepository,
-  ) {}
+    public inmuebleRepository: InmuebleRepository,
+    @service(InmuebleService)
+    public inmuebleService: InmuebleService
+  ) { }
 
+  @authenticate.skip()
+  @get('/inmuebles-disponibles')
+  @response(200, {
+    description: 'Inmuebles disponibles para arriendo',
+    content: {
+      'application/json': {
+        schema: {
+          type: 'array',
+          items: getModelSchemaRef(Inmueble, {includeRelations: true}),
+        },
+      },
+    },
+  })
+  async inmueblesDisponiblesParaArriendo(): Promise<Inmueble[]> {
+    return this.inmuebleService.getInmueblesDisponibles();
+
+  }
+
+  @authenticate.skip()
+  @get('/inmuebles-precio-mayor-a/{valor}')
+  @response(200, {
+    description: 'Inmuebles con precio mayor a $ ###.###.####',
+    content: {
+      'application/json': {
+        schema: {
+          type: 'array',
+          items: getModelSchemaRef(Inmueble, {includeRelations: true}),
+        },
+      },
+    },
+  })
+  async inmueblesConPrecioMayorA(
+    @param.path.number('valor') valor: number
+  ): Promise<Inmueble[]> {
+    return this.inmuebleService.getInmueblesPreciomMayorA(valor);
+  }
+
+  @authenticate.skip()
+  @get('/inmuebles-por-barrio/{ubicacion}')
+  @response(200, {
+    description: 'Inmuebles por barrio',
+    content: {
+      'application/json': {
+        schema: {
+          type: 'array',
+          items: getModelSchemaRef(Inmueble, {includeRelations: true}),
+        },
+      },
+    },
+  })
+  async inmueblesPorBarrio(
+    @param.path.string('ubicacion') ubicacion: string
+  ): Promise<Inmueble[]> {
+    return this.inmuebleService.getInmueblesPorBarrio(ubicacion);
+  }
+
+
+  @authenticate.skip()
   @post('/inmuebles')
   @response(200, {
     description: 'Inmueble model instance',
@@ -58,6 +116,7 @@ export class InmuebleController {
     return this.inmuebleRepository.count(where);
   }
 
+  @authenticate.skip()
   @get('/inmuebles')
   @response(200, {
     description: 'Array of Inmueble model instances',
